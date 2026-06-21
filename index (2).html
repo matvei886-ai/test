@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>erp.example.com — Баги: До / После</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#F7F7F5;--surface:#fff;--surface2:#F0F0EC;--text:#1a1a1a;--text2:#6b6b6b;--text3:#9a9a9a;
+  --accent:#2D6A4F;--accent-light:#D8F3DC;--accent-dark:#1B4332;
+  --err:#C1292E;--err-bg:#FDEAEA;--ok:#2D6A4F;--ok-bg:#D8F3DC;
+  --warn:#B08D27;--warn-bg:#FEF6DB;
+  --border:#E5E4E0;--radius:10px;--radius-lg:14px;
+  --erp-blue:#3B82F6;--erp-sidebar:#0F2A1E;
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh;-webkit-text-size-adjust:100%;
+}
+.page-header{
+  background:linear-gradient(135deg,#0F2A1E 0%,#1B4332 50%,#2D6A4F 100%);
+  padding:2.25rem 1.25rem 1.75rem;color:#fff;text-align:center;
+}
+.page-header h1{font-size:1.4rem;font-weight:700;margin-bottom:0.2rem;}
+.page-header p{font-size:0.82rem;opacity:0.78;}
+
+.container{max-width:760px;margin:0 auto;padding:1rem;}
+
+/* ===== radio-driven bug switcher (no JS) ===== */
+.bugnav{display:flex;gap:6px;overflow-x:auto;margin-bottom:1.25rem;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+.bugnav::-webkit-scrollbar{display:none;}
+.bugnav label{
+  flex-shrink:0;padding:9px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);
+  font-size:0.78rem;font-weight:600;color:var(--text2);cursor:pointer;white-space:nowrap;min-height:38px;
+  display:flex;align-items:center;user-select:none;
+}
+input[type="radio"], input[type="checkbox"]{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}
+
+.bugpanel{display:none;}
+
+#bug-1:checked ~ .container .bugnav label[for="bug-1"],
+#bug-2:checked ~ .container .bugnav label[for="bug-2"],
+#bug-3:checked ~ .container .bugnav label[for="bug-3"],
+#bug-4:checked ~ .container .bugnav label[for="bug-4"]{
+  background:var(--accent);color:#fff;border-color:var(--accent);
+}
+#bug-1:checked ~ .container #panel-1,
+#bug-2:checked ~ .container #panel-2,
+#bug-3:checked ~ .container #panel-3,
+#bug-4:checked ~ .container #panel-4{
+  display:block;animation:fadeUp 0.25s ease;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+.bug-meta{margin-bottom:1rem;}
+.bug-num{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);font-weight:700;margin-bottom:4px;}
+.bug-title{font-size:1.15rem;font-weight:700;margin-bottom:4px;}
+.bug-section{font-size:0.78rem;color:var(--text3);margin-bottom:8px;}
+.bug-desc{font-size:0.85rem;color:var(--text2);line-height:1.55;}
+
+/* ===== before/after toggle (checkbox driven) ===== */
+.toggle-row{display:flex;gap:6px;margin:1rem 0;background:var(--surface2);padding:4px;border-radius:10px;}
+.toggle-row label{
+  flex:1;padding:10px;border-radius:7px;border:none;background:transparent;font-size:0.82rem;font-weight:700;
+  cursor:pointer;min-height:42px;color:var(--text2);text-align:center;display:flex;align-items:center;justify-content:center;
+  user-select:none;
+}
+.state-before label.lbl-before, .state-after label.lbl-after{display:none;}
+
+/* default (unchecked) = BEFORE state */
+.toggle-row label.lbl-before{background:#FDEAEA;color:#A32D2D;}
+.view-after{display:none;}
+.view-before{display:block;}
+.note-before{display:flex;}
+.note-after{display:none;}
+
+/* checked = AFTER state */
+input.fix-toggle:checked ~ .toggle-row label.lbl-before{background:transparent;color:var(--text2);}
+input.fix-toggle:checked ~ .toggle-row label.lbl-after{background:var(--ok-bg);color:var(--accent-dark);}
+input.fix-toggle:checked ~ .browser .view-before{display:none;}
+input.fix-toggle:checked ~ .browser .view-after{display:block;}
+input.fix-toggle:checked ~ .browser .note-before{display:none;}
+input.fix-toggle:checked ~ .browser .note-after{display:flex;}
+
+.browser{
+  border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface);
+  box-shadow:0 2px 10px rgba(0,0,0,0.06);
+}
+.browser-bar{
+  background:#EDEDEA;padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);
+}
+.dots{display:flex;gap:5px;}
+.dot{width:9px;height:9px;border-radius:50%;}
+.dot.r{background:#FF5F57;}.dot.y{background:#FEBC2E;}.dot.g{background:#28C840;}
+.urlbar{flex:1;background:#fff;border-radius:6px;padding:5px 10px;font-size:0.68rem;color:var(--text3);border:1px solid var(--border);}
+
+.erp-shell{display:flex;min-height:280px;}
+.erp-sidebar{width:44px;background:var(--erp-sidebar);flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:14px;}
+.erp-icon{width:18px;height:18px;border-radius:4px;background:rgba(255,255,255,0.18);}
+.erp-icon.active{background:var(--erp-blue);}
+.erp-main{flex:1;padding:14px;overflow:hidden;position:relative;}
+
+.fake-toolbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.fake-pill{border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:0.68rem;color:var(--text2);background:#fff;display:flex;align-items:center;gap:4px;}
+.fake-pill.active{border-color:var(--erp-blue);color:var(--erp-blue);}
+
+.counter-badge{
+  display:inline-flex;align-items:center;gap:6px;background:var(--accent-light);color:var(--accent-dark);
+  padding:7px 12px;border-radius:8px;font-size:0.74rem;font-weight:700;margin-bottom:10px;
+}
+.counter-badge.ghost{background:var(--surface2);color:var(--text3);font-weight:500;border:1px dashed var(--border);}
+.dropdown-mock{border:1px solid var(--border);border-radius:8px;background:#fff;font-size:0.72rem;overflow:hidden;margin-bottom:10px;}
+.dropdown-mock .opt{padding:8px 12px;border-bottom:1px solid #f2f2ef;display:flex;justify-content:space-between;}
+.dropdown-mock .opt:last-child{border-bottom:none;}
+.dropdown-mock .count{color:var(--accent);font-weight:700;}
+.dropdown-mock .count.ghost{color:var(--text3);font-weight:400;}
+
+.fake-btn{padding:10px 16px;border-radius:8px;font-size:0.78rem;font-weight:700;border:none;display:inline-block;}
+.fake-btn.blue{background:var(--erp-blue);color:#fff;}
+.fake-btn.gray{background:#cbd5e1;color:#64748b;}
+
+.fake-check{display:flex;align-items:center;gap:8px;font-size:0.76rem;margin-bottom:5px;}
+.fake-check .box{width:16px;height:16px;border-radius:4px;background:var(--erp-blue);display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.6rem;flex-shrink:0;}
+
+.mail-modal{border:1px solid var(--border);border-radius:10px;background:#fff;overflow:hidden;}
+.mail-modal-head{padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;font-size:0.78rem;}
+.mail-modal-body{padding:12px 14px;}
+.mail-field{border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:0.7rem;color:var(--text3);margin-bottom:8px;}
+.mail-editor{
+  border:1px solid var(--border);border-radius:6px;padding:10px;font-size:0.68rem;color:var(--text2);
+  position:relative;overflow:hidden;min-height:130px;
+}
+.mail-editor.fixed-height{max-height:90px;overflow-y:auto;border-color:var(--erp-blue);min-height:0;}
+.attach-block{
+  border-top:1px solid var(--border);margin-top:8px;padding-top:8px;font-size:0.68rem;
+}
+.attach-row{display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:6px 8px;border-radius:5px;margin-top:5px;}
+.mail-footer{padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;background:#fafaf8;}
+.cut-off-zone{
+  position:relative;height:46px;border-top:1px solid var(--border);background:repeating-linear-gradient(45deg,#fff,#fff 4px,#fdeaea 4px,#fdeaea 8px);
+  display:flex;align-items:center;justify-content:center;
+}
+.cut-off-zone span{font-size:0.62rem;color:var(--err);font-weight:700;background:#fff;padding:2px 8px;border-radius:4px;border:1px solid #f3b8b8;}
+
+.flow{display:flex;flex-direction:column;gap:0;}
+.flow-step{display:flex;align-items:center;gap:10px;padding:10px 0;}
+.flow-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;flex-shrink:0;color:#fff;font-weight:700;}
+.flow-dot.ok{background:var(--ok);}
+.flow-dot.fail{background:var(--err);}
+.flow-dot.pending{background:#cbd5e1;color:#64748b;}
+.flow-line{width:2px;height:18px;background:var(--border);margin-left:14px;}
+.flow-text{font-size:0.78rem;}
+.flow-text b{display:block;font-size:0.82rem;}
+.flow-text span{color:var(--text3);font-size:0.7rem;}
+
+.strike-note{font-size:0.68rem;color:var(--err);font-weight:700;margin-top:6px;align-items:center;gap:4px;}
+.ok-note{font-size:0.68rem;color:var(--accent);font-weight:700;margin-top:6px;align-items:center;gap:4px;}
+
+.hint{font-size:0.74rem;color:var(--text3);margin-top:1.5rem;text-align:center;padding:10px;background:var(--surface2);border-radius:var(--radius);}
+</style>
+</head>
+<body>
+
+<!-- bug switcher radios: must precede .container to use ~ sibling selector -->
+<input type="radio" name="bugswitch" id="bug-1" class="bugswitch" checked>
+<input type="radio" name="bugswitch" id="bug-2" class="bugswitch">
+<input type="radio" name="bugswitch" id="bug-3" class="bugswitch">
+<input type="radio" name="bugswitch" id="bug-4" class="bugswitch">
+
+<div class="page-header">
+  <h1>erp.example.com — баги: До / После</h1>
+  <p>4 задачи · нажмите на вкладку и переключайте состояние</p>
+</div>
+
+<div class="container">
+
+  <div class="bugnav">
+    <label for="bug-1">1. Счётчик базы</label>
+    <label for="bug-2">2. Счётчик в КП</label>
+    <label for="bug-3">3. Вложения писем</label>
+    <label for="bug-4">4. Доставка КП</label>
+  </div>
+
+  <!-- BUG 1: global + dropdown counters -->
+  <div class="bugpanel" id="panel-1">
+    <div class="bug-meta">
+      <div class="bug-num">Баг 1</div>
+      <div class="bug-title">Нет счётчика поставщиков (общего и по категориям)</div>
+      <div class="bug-section">/suppliers</div>
+      <div class="bug-desc">Снабженец не видит масштаб базы и распределение поставщиков по товарным группам.</div>
+    </div>
+
+    <input type="checkbox" id="fix-1" class="fix-toggle">
+    <div class="toggle-row">
+      <label for="fix-1" class="lbl-before">До (баг)</label>
+      <label for="fix-1" class="lbl-after">После (фикс)</label>
+    </div>
+
+    <div class="browser">
+      <div class="browser-bar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><div class="urlbar">erp.example.com/suppliers</div></div>
+      <div class="erp-shell">
+        <div class="erp-sidebar"><div class="erp-icon"></div><div class="erp-icon active"></div><div class="erp-icon"></div><div class="erp-icon"></div></div>
+        <div class="erp-main">
+          <div class="fake-toolbar"><div class="fake-pill">Все статусы</div><div class="fake-pill">Все категории</div><div class="fake-pill">Все товарные группы</div></div>
+
+          <div class="view-before">
+            <div class="counter-badge ghost">Счётчик отсутствует</div>
+            <div class="dropdown-mock">
+              <div class="opt"><span>Благоустройство и МАФы</span><span class="count ghost">—</span></div>
+              <div class="opt"><span>Металлопрокат</span><span class="count ghost">—</span></div>
+              <div class="opt"><span>Сантехника и трубы</span><span class="count ghost">—</span></div>
+            </div>
+          </div>
+          <div class="view-after">
+            <div class="counter-badge">Найдено: 14 из 334</div>
+            <div class="dropdown-mock">
+              <div class="opt"><span>Благоустройство и МАФы</span><span class="count">14</span></div>
+              <div class="opt"><span>Металлопрокат</span><span class="count">28</span></div>
+              <div class="opt"><span>Сантехника и трубы</span><span class="count">9</span></div>
+            </div>
+          </div>
+
+          <div class="strike-note note-before">⚠ Снабженец не видит масштаб базы и распределение по нишам</div>
+          <div class="ok-note note-after">✓ Счётчик пересчитывается мгновенно при смене фильтра</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG 2: rfq modal counter -->
+  <div class="bugpanel" id="panel-2">
+    <div class="bug-meta">
+      <div class="bug-num">Баг 2</div>
+      <div class="bug-title">Нет счётчика выбранных поставщиков в модалке КП</div>
+      <div class="bug-section">Модальное окно «Запрос коммерческого предложения»</div>
+      <div class="bug-desc">Кнопка «Создать» не показывает, скольким поставщикам уйдёт запрос — снабженец не видит, выполняет ли он норматив (например, 3 КП для анализа).</div>
+    </div>
+
+    <input type="checkbox" id="fix-2" class="fix-toggle">
+    <div class="toggle-row">
+      <label for="fix-2" class="lbl-before">До (баг)</label>
+      <label for="fix-2" class="lbl-after">После (фикс)</label>
+    </div>
+
+    <div class="browser">
+      <div class="browser-bar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><div class="urlbar">erp.example.com/projects/18?tab=requests</div></div>
+      <div class="erp-shell">
+        <div class="erp-sidebar"><div class="erp-icon"></div><div class="erp-icon"></div><div class="erp-icon active"></div><div class="erp-icon"></div></div>
+        <div class="erp-main">
+          <div style="font-size:0.78rem;font-weight:700;margin-bottom:8px;">Поставщики для рассылки</div>
+
+          <div class="view-before">
+            <div class="dropdown-mock"><div class="opt"><span>Благоустройство и МАФы</span><span class="count ghost">—</span></div></div>
+          </div>
+          <div class="view-after">
+            <div class="dropdown-mock"><div class="opt"><span>Благоустройство и МАФы</span><span class="count">8</span></div></div>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <div class="fake-check"><div class="box">✓</div>Поставщик А</div>
+            <div class="fake-check"><div class="box">✓</div>Поставщик Б</div>
+            <div class="fake-check"><div class="box">✓</div>Поставщик В</div>
+          </div>
+
+          <div class="view-before"><button class="fake-btn blue">Создать</button></div>
+          <div class="view-after"><button class="fake-btn blue">Создать и отправить (3)</button></div>
+
+          <div class="strike-note note-before" style="margin-top:8px;">⚠ Непонятно, скольким поставщикам уйдёт запрос</div>
+          <div class="ok-note note-after" style="margin-top:8px;">✓ Видно точное число получателей перед отправкой</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG 3: mail attachments cut off -->
+  <div class="bugpanel" id="panel-3">
+    <div class="bug-meta">
+      <div class="bug-num">Баг 3</div>
+      <div class="bug-title">Вложения пропадают под футером в длинных письмах</div>
+      <div class="bug-section">/mail — окно «Новое письмо»</div>
+      <div class="bug-desc">Если текст письма длинный, редактор растягивается и выталкивает блок вложений под фиксированный футер — файлы не видны и их нельзя удалить.</div>
+    </div>
+
+    <input type="checkbox" id="fix-3" class="fix-toggle">
+    <div class="toggle-row">
+      <label for="fix-3" class="lbl-before">До (баг)</label>
+      <label for="fix-3" class="lbl-after">После (фикс)</label>
+    </div>
+
+    <div class="browser">
+      <div class="browser-bar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><div class="urlbar">erp.example.com/mail</div></div>
+      <div class="erp-main" style="padding:14px;">
+        <div class="mail-modal">
+          <div class="mail-modal-head">Новое письмо</div>
+          <div class="mail-modal-body">
+            <div class="mail-field">Кому (email)</div>
+            <div class="mail-field">Тема</div>
+
+            <div class="view-before">
+              <div class="mail-editor">Кроме того, мы выступаем как прямые покупатели. Сейчас мы ведём строительство двух объектов и готовы закупать материал под собственные нужды. Просим предоставить коммерческое предложение под наш ближайший объект.</div>
+              <div class="cut-off-zone"><span>Блок «Вложения» скрыт под футером, скролла нет</span></div>
+            </div>
+
+            <div class="view-after">
+              <div class="mail-editor fixed-height">Кроме того, мы выступаем как прямые покупатели. Сейчас мы ведём строительство двух объектов и готовы закупать материал под собственные нужды. Просим предоставить коммерческое предложение под наш ближайший объект.</div>
+              <div class="attach-block">Вложения (2) — 105.6 КБ
+                <div class="attach-row"><span>📄 Спецификация.pdf</span><span style="color:var(--err);font-weight:700;">✕</span></div>
+                <div class="attach-row"><span>📄 Позиции по объекту.xlsx</span><span style="color:var(--err);font-weight:700;">✕</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="mail-footer"><div class="fake-btn gray">Отмена</div><div class="fake-btn blue">Отправить</div></div>
+        </div>
+
+        <div class="strike-note note-before" style="margin-top:10px;">⚠ Окно не прокручивается, файлы нельзя увидеть и удалить</div>
+        <div class="ok-note note-after" style="margin-top:10px;">✓ Редактор скроллится сам, вложения всегда видны над футером</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUG 4: delivery flow -->
+  <div class="bugpanel" id="panel-4">
+    <div class="bug-meta">
+      <div class="bug-num">Баг 4</div>
+      <div class="bug-title">Письма-запросы КП не доходят до поставщиков</div>
+      <div class="bug-section">/projects/[id]?tab=requests — рассылка запросов</div>
+      <div class="bug-desc">Фронтенд отрабатывает штатно, но письма теряются на стороне транспорта приложения. Обычная почта при этом доставляется мгновенно.</div>
+    </div>
+
+    <input type="checkbox" id="fix-4" class="fix-toggle">
+    <div class="toggle-row">
+      <label for="fix-4" class="lbl-before">До (баг)</label>
+      <label for="fix-4" class="lbl-after">После (фикс)</label>
+    </div>
+
+    <div class="browser">
+      <div class="browser-bar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><div class="urlbar">erp.example.com/projects/18?tab=requests</div></div>
+      <div class="erp-main" style="padding:18px 14px;">
+
+        <div class="view-before">
+          <div class="flow">
+            <div class="flow-step"><div class="flow-dot ok">✓</div><div class="flow-text"><b>Фронтенд: форма отправлена</b><span>Запрос КП создан, кнопка «Отправить» нажата</span></div></div>
+            <div class="flow-line"></div>
+            <div class="flow-step"><div class="flow-dot fail">✕</div><div class="flow-text"><b>Бэкенд: письмо теряется</b><span>Ошибка в обработчике / очереди / SMTP-транспорте</span></div></div>
+            <div class="flow-line"></div>
+            <div class="flow-step"><div class="flow-dot pending">?</div><div class="flow-text" style="color:var(--text3);"><b>Поставщик</b><span>Письмо не получено</span></div></div>
+          </div>
+          <div class="strike-note note-before">⚠ Обычная почта из /mail доставляется мгновенно — проблема именно в транспорте раздела «Запросы»</div>
+        </div>
+
+        <div class="view-after">
+          <div class="flow">
+            <div class="flow-step"><div class="flow-dot ok">✓</div><div class="flow-text"><b>Фронтенд: форма отправлена</b><span>Запрос КП создан, кнопка «Отправить» нажата</span></div></div>
+            <div class="flow-line"></div>
+            <div class="flow-step"><div class="flow-dot ok">✓</div><div class="flow-text"><b>Очередь: задача обработана</b><span>Worker забрал письмо, лог записан</span></div></div>
+            <div class="flow-line"></div>
+            <div class="flow-step"><div class="flow-dot ok">✓</div><div class="flow-text"><b>SMTP: письмо отправлено</b><span>SPF / DKIM на домене настроены</span></div></div>
+            <div class="flow-line"></div>
+            <div class="flow-step"><div class="flow-dot ok">✓</div><div class="flow-text"><b>Поставщик получил письмо</b><span>Доставлено за 4 секунды</span></div></div>
+          </div>
+          <div class="ok-note note-after">✓ Рассылка логируется на каждом этапе и стабильно доставляется</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="hint">Это рабочий макет интерфейса (не подключён к вашей базе) — нужен, чтобы согласовать с командой, как должно выглядеть после фикса. Сделан на чистом HTML/CSS, без JavaScript.</div>
+</div>
+
+</body>
+</html>
